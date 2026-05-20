@@ -1,6 +1,6 @@
 """
 行业数字员工——企业记忆智能体
-Streamlit 演示界面
+LLM 驱动的对话式智能分析
 """
 
 import streamlit as st
@@ -8,324 +8,297 @@ import pandas as pd
 import sqlite3
 import plotly.express as px
 import plotly.graph_objects as go
+import requests
+import json
+import re
+import os
 from datetime import datetime
+from dotenv import load_dotenv
 
-st.set_page_config(
-    page_title="企业记忆智能体",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-# ── 数据库连接 ──────────────────────────────────────────
+DEEPSEEK_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com") + "/v1/chat/completions"
+
+st.set_page_config(page_title="企业记忆智能体", page_icon="🧠", layout="wide", initial_sidebar_state="collapsed")
+
+# ── 样式 ──────────────────────────────────────────────
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .stat-card { background: linear-gradient(135deg, #111827 0%, #1a1f35 100%); border: 1px solid #1f2937; border-radius: 12px; padding: 1rem; text-align: center; }
+    .stat-value { font-size: 1.8rem; font-weight: 700; color: #22d3ee; }
+    .stat-label { font-size: 0.75rem; color: #6b7280; }
+    .sidebar-box { background: #0d1320; border: 1px solid #1a2744; border-radius: 8px; padding: 0.8rem; margin: 0.5rem 0; font-size: 0.8rem; color: #9ca3af; line-height: 1.5; }
+    .sidebar-box .title { font-size: 0.75rem; color: #6b7280; margin-bottom: 0.4rem; }
+    div[data-testid="stSidebar"] { background: #070b14; }
+    .tip-box { background: #0d1a16; border: 1px solid #1a3a2e; border-radius: 6px; padding: 0.6rem 0.8rem; font-size: 0.75rem; color: #6ee7b7; }
+    section.main > div:has(.stChatMessage) { padding-top: 0; }
+</style>
+""", unsafe_allow_html=True)
+
+# ── 数据库 ────────────────────────────────────────────
 DB_PATH = "/home/administrator/finance_data/db/finance.db"
 
 @st.cache_resource
-def get_connection():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+def get_conn():
+    c = sqlite3.connect(DB_PATH, check_same_thread=False)
+    c.row_factory = sqlite3.Row
+    return c
 
-@st.cache_data(ttl=300)
-def run_query(sql, params=None):
-    conn = get_connection()
-    return pd.read_sql_query(sql, conn, params=params)
+def run_sql(sql):
+    return pd.read_sql_query(sql, get_conn())
 
-# ── 预定义查询 ──────────────────────────────────────────
-PRESET_QUERIES = {
-    "各部门费用排名": """
-        SELECT department, ROUND(SUM(debit), 2) as total_expense
-        FROM journal
-        WHERE account_code LIKE '6601%' OR account_code LIKE '6602%' OR account_code LIKE '6603%'
-          AND department IS NOT NULL AND department != ''
-        GROUP BY department
-        ORDER BY total_expense DESC
-    """,
-    "月度收入趋势": """
-        SELECT year, period, ROUND(SUM(CASE WHEN debit > credit THEN debit ELSE credit END), 2) as revenue
-        FROM journal
-        WHERE account_code LIKE '6001%'
-        GROUP BY year, period
-        ORDER BY year, period
-    """,
-    "月度费用趋势": """
-        SELECT year, period,
-               ROUND(SUM(CASE WHEN account_code LIKE '6601%' THEN debit ELSE 0 END), 2) as sales_expense,
-               ROUND(SUM(CASE WHEN account_code LIKE '6602%' THEN debit ELSE 0 END), 2) as admin_expense,
-               ROUND(SUM(CASE WHEN account_code LIKE '6603%' THEN debit ELSE 0 END), 2) as finance_expense
-        FROM journal
-        WHERE account_code LIKE '6601%' OR account_code LIKE '6602%' OR account_code LIKE '6603%'
-        GROUP BY year, period
-        ORDER BY year, period
-    """,
-    "核心科目余额": """
-        SELECT account_code, account_name,
-               ROUND(SUM(debit), 2) as total_debit,
-               ROUND(SUM(credit), 2) as total_credit,
-               ROUND(SUM(debit) - SUM(credit), 2) as balance
-        FROM journal
-        WHERE account_code NOT LIKE '660%' AND account_code NOT LIKE '600%'
-        GROUP BY account_code
-        HAVING ABS(SUM(debit) - SUM(credit)) > 1000000
-        ORDER BY ABS(balance) DESC
-        LIMIT 20
-    """,
-    "电商平台推广费明细": """
-        SELECT year, period, department, ROUND(SUM(debit), 2) as promotion_fee
-        FROM journal
-        WHERE account_name LIKE '%推广%' OR account_name LIKE '%电商%'
-        GROUP BY year, period, department
-        ORDER BY year, period, promotion_fee DESC
-        LIMIT 30
-    """,
-    "资金渠道分布": """
-        SELECT 
-            CASE 
-                WHEN account_name LIKE '%支付宝%' THEN '支付宝'
-                WHEN account_name LIKE '%微信%' THEN '微信商户'
-                WHEN account_name LIKE '%银行%' THEN '银行存款'
-                ELSE '其他'
-            END as channel,
-            ROUND(SUM(credit) - SUM(debit), 2) as net_flow
-        FROM journal
-        WHERE account_code LIKE '100%'
-        GROUP BY channel
-        ORDER BY net_flow DESC
-    """,
-}
+@st.cache_data
+def get_schema():
+    """获取数据库 schema 信息给 LLM"""
+    conn = get_conn()
+    # 表结构
+    cols = pd.read_sql_query("PRAGMA table_info(journal)", conn)
+    schema = "表 journal (" + ", ".join(f"{r['name']} {r['type']}" for _, r in cols.iterrows()) + ")\n\n"
+
+    # 科目列表（前50个重要科目）
+    accts = pd.read_sql_query("""
+        SELECT account_code, account_name, COUNT(*) as cnt,
+               ROUND(SUM(debit),0) as total_debit, ROUND(SUM(credit),0) as total_credit
+        FROM journal GROUP BY account_code ORDER BY cnt DESC LIMIT 50
+    """, conn)
+    schema += "主要科目:\n"
+    for _, r in accts.iterrows():
+        schema += f"  {r['account_code']} | {r['account_name']} | {r['cnt']}条 | 借{r['total_debit']:.0f} 贷{r['total_credit']:.0f}\n"
+
+    # 部门列表
+    depts = pd.read_sql_query("SELECT DISTINCT department FROM journal WHERE department IS NOT NULL AND department != '' ORDER BY department", conn)
+    schema += f"\n部门: {', '.join(depts['department'].tolist())}\n"
+
+    # 年份
+    years = pd.read_sql_query("SELECT DISTINCT year FROM journal ORDER BY year", conn)
+    schema += f"年份: {', '.join(map(str, years['year'].tolist()))}\n"
+
+    # 数据量
+    cnt = pd.read_sql_query("SELECT COUNT(*) as n FROM journal", conn)
+    schema += f"\n总记录数: {cnt['n'].iloc[0]:,} 条\n"
+
+    return schema
+
+SCHEMA = get_schema()
+
+# ── LLM 调用 ──────────────────────────────────────────
+SYSTEM_PROMPT = f"""你是一个企业财务数据分析助手。你可以访问一个叫 journal 的表，结构如下：
+
+{SCHEMA}
+
+你的任务：根据用户的中文问题，生成一条 SQLite SQL 查询。
+
+规则：
+1. 所有金额字段用 ROUND(..., 2) 保留两位小数
+2. 费用类科目代码以 6601(销售)、6602(管理)、6603(财务) 开头
+3. 收入类科目代码以 6001 开头
+4. 成本类科目代码以 6401 开头
+5. 资产负债类科目代码以 1(资产)、2(负债)、3(权益)、4(成本)、5(损益) 开头，但 6001/6401/6601-6603 除外
+6. 收入的算法是 max(debit, credit) —— 因为收入记贷方但可能有退货
+7. 费用的算法是 sum(debit) —— 费用记借方
+8. 银行/现金科目代码以 100 开头
+9. 如果用户问"上个月"，取当前最大月份-1；"这个月"取最大月份；"今年"取最大年份
+10. 如果用户问"花了多少钱"/"费用"/"支出"，查询全部费用（6601/6602/6603的debit总额）
+11. 如果用户问"赚了多少"/"利润"，用 收入 - 成本 - 费用 估算
+12. 不确定时：宁可多查，不要太限制
+
+返回格式：严格的 JSON，不要 markdown 包裹：
+{{"sql": "你的SQL语句", "explanation": "简短说明这查询做了什么", "chart": "line|bar|barh|pie|table"}}"""
 
 
-# ── 侧边栏 ──────────────────────────────────────────────
-st.sidebar.title("🧠 企业记忆智能体")
-st.sidebar.caption("行业数字员工——企业记忆智能体")
+def ask_llm(question: str, history: list = None) -> dict:
+    """调用 DeepSeek，返回 {sql, explanation, chart}"""
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-tab = st.sidebar.radio(
-    "导航",
-    ["🏠 系统概览", "💬 数据对话", "🧩 记忆引擎", "📊 报表中心"],
-)
+    if history:
+        for h in history[-6:]:  # 最近3轮对话
+            role = "user" if h["role"] == "user" else "assistant"
+            content = h["content"]
+            if h.get("sql"):
+                content += f"\n[SQL: {h['sql'][:200]}]"
+            messages.append({"role": role, "content": content})
 
-st.sidebar.caption(f"数据库: 3,017,575 条分录 | 116个科目 | 21个部门")
+    messages.append({"role": "user", "content": question})
 
+    try:
+        resp = requests.post(
+            DEEPSEEK_URL,
+            headers={"Authorization": f"Bearer {DEEPSEEK_KEY}", "Content-Type": "application/json"},
+            json={"model": "deepseek-chat", "messages": messages, "temperature": 0.1, "max_tokens": 800},
+            timeout=30
+        )
+        if resp.status_code != 200:
+            return {"error": f"API 错误: {resp.status_code}"}
 
-# ── Tab 1: 系统概览 ─────────────────────────────────────
-if tab == "🏠 系统概览":
-    st.title("行业数字员工——企业记忆智能体")
-    st.subheader("让每家企业拥有一个懂业务、会学习的 AI 数字员工")
+        text = resp.json()["choices"][0]["message"]["content"].strip()
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("数据量", "301万条", "会计分录")
-    col2.metric("科目数", "116个", "分级科目")
-    col3.metric("部门数", "21个", "组织架构")
-    col4.metric("记忆层", "4层", "持久记忆")
+        # 清理可能的 markdown 包裹
+        text = re.sub(r'^```(?:json)?\s*', '', text)
+        text = re.sub(r'\s*```$', '', text)
 
-    st.divider()
-
-    st.markdown("""
-    ### 系统架构
-
-    ```
-    ┌──────────────────────────────────────────────────┐
-    │              交互层                               │
-    │   Streamlit Web  │  飞书机器人 @对话              │
-    ├──────────────────────────────────────────────────┤
-    │           Agent 编排层 (Hermes)                   │
-    │  ┌──────┐ ┌──────┐ ┌──────┐ ┌────────┐         │
-    │  │数据  │ │报表  │ │飞书  │ │知识    │         │
-    │  │查询  │ │生成  │ │集成  │ │摄入    │         │
-    │  └──────┘ └──────┘ └──────┘ └────────┘         │
-    ├──────────────────────────────────────────────────┤
-    │       企业记忆引擎 (MCP Server)                   │
-    │  ┌─────────┐ ┌─────────┐ ┌───────┐ ┌────────┐  │
-    │  │Memory   │ │偏好记忆  │ │纠错   │ │知识    │  │
-    │  │Tree     │ │会计周期  │ │记忆   │ │图谱    │  │
-    │  └─────────┘ └─────────┘ └───────┘ └────────┘  │
-    ├──────────────────────────────────────────────────┤
-    │      ChromaDB 向量库 + SQLite 结构化存储         │
-    └──────────────────────────────────────────────────┘
-    ```
-
-    ### 什么是"四层记忆"？
-
-    普通的 AI 问答每次对话都是"从零开始"，像金鱼一样只有7秒记忆。  
-    我们的智能体有**四层持久记忆**，越用越聪明：
-    """)
-
-    mem_cols = st.columns(4)
-    with mem_cols[0]:
-        st.info("**Memory Tree**\n\n文档向量化存储\n语义检索\n自动切片去重")
-    with mem_cols[1]:
-        st.success("**偏好记忆**\n\n字段映射\n会计周期规则\n企业特殊做法")
-    with mem_cols[2]:
-        st.warning("**纠错记忆**\n\n历史错误记录\n正确做法\n自动衰减")
-    with mem_cols[3]:
-        st.error("**知识图谱**\n\n实体关系\n部门归属\n人员关联")
+        result = json.loads(text)
+        return {
+            "sql": result.get("sql", ""),
+            "explanation": result.get("explanation", ""),
+            "chart": result.get("chart", "table")
+        }
+    except json.JSONDecodeError:
+        return {"error": "LLM 返回格式异常", "raw": text[:500]}
+    except Exception as e:
+        return {"error": str(e)}
 
 
-# ── Tab 2: 数据对话 ─────────────────────────────────────
-elif tab == "💬 数据对话":
-    st.title("💬 对话式数据查询")
-    st.caption("像跟同事说话一样，提问即可获得分析结果。不需要写SQL。")
+# ── 图表生成 ──────────────────────────────────────────
+def make_chart(df, chart_type, title):
+    """根据 chart_type 生成 Plotly 图表"""
+    fig = None
+    num_cols = df.select_dtypes(include='number').columns.tolist()
+    if not num_cols:
+        return None
 
-    mode = st.radio("查询方式", ["📋 预设问题", "✏️ 自定义SQL"], horizontal=True)
+    cat_cols = [c for c in df.columns if c not in num_cols]
+    x = cat_cols[0] if cat_cols else df.columns[0]
 
-    if mode == "📋 预设问题":
-        query_name = st.selectbox("选择问题", list(PRESET_QUERIES.keys()))
-        sql = PRESET_QUERIES[query_name]
-        st.code(sql, language="sql")
-
-        if st.button("🔍 执行查询", type="primary"):
-            with st.spinner("Agent 正在分析..."):
-                df = run_query(sql)
-                st.success(f"查询完成，返回 {len(df)} 条记录")
-                st.dataframe(df, use_container_width=True, height=300)
-
-                # 自动选择图表类型
-                num_cols = df.select_dtypes(include='number').columns.tolist()
-                if len(df.columns) >= 2:
-                    if 'period' in df.columns or 'year' in df.columns:
-                        # 时间序列 -> 折线图
-                        x_col = 'period' if 'period' in df.columns else 'year'
-                        if len(num_cols) >= 2:
-                            fig = px.line(df, x=x_col, y=num_cols[:4],
-                                        title=f"{query_name} - 趋势")
-                        else:
-                            fig = px.bar(df, x=df.columns[0], y=num_cols[0],
-                                       title=query_name)
-                    else:
-                        # 排名 -> 横向柱状图
-                        fig = px.bar(df, x=num_cols[0], y=df.columns[0],
-                                   orientation='h', title=query_name)
-                    st.plotly_chart(fig, use_container_width=True)
-
+    if chart_type == "barh" and cat_cols:
+        fig = px.bar(df, x=num_cols[0], y=x, orientation='h', template='plotly_dark',
+                    color=num_cols[0], color_continuous_scale='blues')
+        fig.update_layout(height=max(280, len(df)*22), yaxis={'categoryorder': 'total ascending'})
+    elif chart_type == "line":
+        color = next((c for c in cat_cols if '年' in str(c)), None)
+        if color and len(num_cols) == 1:
+            fig = px.line(df, x=x, y=num_cols[0], color=color, markers=True, template='plotly_dark')
+        else:
+            fig = px.line(df, x=x, y=num_cols, markers=True, template='plotly_dark')
+        fig.update_layout(height=380, hovermode='x unified')
+    elif chart_type == "pie" and cat_cols:
+        fig = px.pie(df, names=x, values=num_cols[0], template='plotly_dark', hole=0.4)
+        fig.update_layout(height=380)
+    elif chart_type == "bar":
+        fig = px.bar(df, x=x, y=num_cols, template='plotly_dark', barmode='group')
+        fig.update_layout(height=380)
     else:
-        custom_sql = st.text_area("输入SQL查询", height=100,
-                                  placeholder="SELECT department, SUM(debit) FROM journal WHERE ...")
-        if st.button("执行", type="primary") and custom_sql.strip():
+        return None
+
+    fig.update_layout(margin=dict(l=20, r=20, t=40, b=20),
+                    legend=dict(orientation='h', yanchor='bottom', y=1.02),
+                    title=title, title_font_size=14)
+    return fig
+
+
+# ── Sidebar ───────────────────────────────────────────
+with st.sidebar:
+    st.markdown("### 🧠 企业记忆智能体")
+    st.caption("基于 DeepSeek LLM · 自然语言 → SQL")
+
+    st.markdown('<div class="sidebar-box"><div class="title">📊 数据库</div>301万条会计分录<br>116个科目 · 21个部门</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-box"><div class="title">🧩 记忆引擎</div>Memory Tree: 35条<br>偏好记忆: 14条规则<br>知识图谱: 34实体</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-box"><div class="title">📋 已学会的规则</div>• 会计周期: 25号→下月25号<br>• 研发支出: 全部费用化<br>• 预付贷方: 重分类至应付<br>• 收入 = max(借,贷)</div>', unsafe_allow_html=True)
+
+# ── 主界面 ────────────────────────────────────────────
+st.markdown("### 💬 对话式企业数据智能分析")
+st.caption("Agent 使用 LLM 理解自然语言，自动生成 SQL 查询并可视化。试试任何问题——越自然越好。")
+
+# 统计
+cols = st.columns(4)
+for val, label in [("301万", "会计分录"), ("116", "科目"), ("21", "部门"), ("LLM", "驱动")]:
+    cols[0].markdown(f'<div class="stat-card"><div class="stat-value">{val}</div><div class="stat-label">{label}</div></div>', unsafe_allow_html=True)
+    cols = cols[1:]
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ── 聊天状态 ──
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "agent", "content": "你好！我是企业记忆智能体，基于 LLM 驱动。我可以理解任何自然语言问题——\n\n试试问我：\n• 公司上个月花了多少钱？\n• 销售培训部今年的费用变化趋势\n• 哪个部门的费用最高？\n• 今年的利润情况怎么样\n• 银行存款还有多少？", "is_welcome": True}
+    ]
+
+# ── 渲染历史 ──
+for i, msg in enumerate(st.session_state.messages):
+    if msg.get("is_welcome"):
+        with st.chat_message("assistant", avatar="🧠"):
+            st.markdown(msg["content"])
+    elif msg["role"] == "user":
+        with st.chat_message("user"):
+            st.markdown(msg["content"])
+    elif msg["role"] == "agent":
+        with st.chat_message("assistant", avatar="🧠"):
+            if msg.get("error"):
+                st.error(msg["content"])
+            else:
+                st.markdown(msg.get("explanation", ""))
+                if "sql" in msg:
+                    with st.expander("🔍 查看生成的 SQL"):
+                        st.code(msg["sql"], language="sql")
+                if "fig" in msg:
+                    st.plotly_chart(msg["fig"], use_container_width=True, key=f"chart_{i}")
+                if "df" in msg:
+                    with st.expander("📋 数据明细"):
+                        st.dataframe(msg["df"], use_container_width=True, height=250)
+
+# ── 输入 ──
+st.markdown("---")
+col1, col2 = st.columns([8, 1])
+with col2:
+    if st.button("🗑️ 清空", use_container_width=True):
+        st.session_state.messages = [{"role": "agent", "content": "对话已清空，有什么新的问题？", "is_welcome": True}]
+        st.rerun()
+
+if prompt := st.chat_input("输入你的问题..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+    with st.chat_message("assistant", avatar="🧠"):
+        status = st.empty()
+
+        # 调用 LLM
+        status.markdown("🧠 *Agent 正在理解你的问题...*")
+        result = ask_llm(prompt, st.session_state.messages)
+
+        if "error" in result:
+            status.empty()
+            st.error(f"**出错**: {result['error']}")
+            if "raw" in result:
+                st.code(result["raw"])
+            st.session_state.messages.append({"role": "agent", "content": result['error'], "error": True})
+        else:
+            # 执行 SQL
+            status.markdown(f"✅ *{result['explanation']}*  \n📊 *正在查询数据...*")
             try:
-                df = run_query(custom_sql)
-                st.dataframe(df, use_container_width=True)
+                df = run_sql(result["sql"])
             except Exception as e:
-                st.error(f"查询错误: {e}")
+                status.empty()
+                st.error(f"SQL 执行出错: {e}")
+                st.code(result["sql"], language="sql")
+                st.session_state.messages.append({"role": "agent", "content": f"SQL 执行出错: {e}", "sql": result["sql"], "error": True})
+                st.rerun()
 
+            status.empty()
 
-# ── Tab 3: 记忆引擎 ─────────────────────────────────────
-elif tab == "🧩 记忆引擎":
-    st.title("🧩 企业记忆引擎状态")
+            if df.empty:
+                st.warning("未找到匹配数据")
+                st.session_state.messages.append({"role": "agent", "content": "未找到匹配数据", "explanation": result['explanation'], "sql": result['sql']})
+            else:
+                # 生成图表
+                fig = make_chart(df, result["chart"], "")
+                msg_data = {
+                    "role": "agent",
+                    "explanation": result["explanation"],
+                    "sql": result["sql"],
+                    "content": result["explanation"]
+                }
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+                    msg_data["fig"] = fig
+                else:
+                    st.dataframe(df, use_container_width=True, height=300)
+                    msg_data["df"] = df
 
-    st.markdown("""
-    ### 四层记忆架构
+                st.caption(f"返回 {len(df)} 条记录")
+                st.session_state.messages.append(msg_data)
 
-    记忆引擎作为独立的 MCP (Model Context Protocol) Server 运行，Agent 每次对话时自动检索四层记忆：
-    """)
+    st.rerun()
 
-    # 模拟记忆引擎状态
-    memory_status = {
-        "Memory Tree": {"count": 35, "status": "✅ 正常", "desc": "文档和数据的向量化索引"},
-        "偏好记忆": {"count": 14, "status": "✅ 正常", "desc": "字段映射、会计周期等规则"},
-        "纠错记忆": {"count": 6, "status": "✅ 正常", "desc": "历史纠正记录和正确做法"},
-        "知识图谱": {"count": 34, "status": "✅ 正常", "desc": "实体关系：34个实体，29条关系"},
-    }
-
-    mem_cols = st.columns(4)
-    for i, (name, info) in enumerate(memory_status.items()):
-        with mem_cols[i]:
-            st.metric(name, info["count"], info["status"])
-            st.caption(info["desc"])
-
-    st.divider()
-
-    st.markdown("### 记忆示例：偏好记忆（企业规则已学习）")
-
-    rules = [
-        ("会计周期", "每月25日至下月25日", "财务政策"),
-        ("研发支出", "全部费用化，不资本化", "会计处理"),
-        ("电商推广费", "科目6601.03——最大费用项", "费用结构"),
-        ("预付账款贷方", "重分类至应付账款", "报表调整"),
-        ("收入算法", "max(借方,贷方)为实际发生额", "计算规则"),
-        ("化妆品模式", "纯贸易/经销，无生产成本", "业务模式"),
-    ]
-
-    rule_df = pd.DataFrame(rules, columns=["规则类型", "具体内容", "分类"])
-    st.dataframe(rule_df, use_container_width=True, hide_index=True)
-
-    st.divider()
-
-    st.markdown("### 知识图谱（部分实体关系）")
-
-    graph_data = [
-        ("化妆品公司", "包含", "21个部门"),
-        ("销售培训部", "产生", "销售费用"),
-        ("电商平台", "渠道", "推广费559万"),
-        ("银行存款", "资金渠道", "净贷方1.4亿"),
-        ("应付账款", "包含", "预付重分类"),
-        ("本年利润", "关联", "利润表差异845万"),
-    ]
-    graph_df = pd.DataFrame(graph_data, columns=["实体A", "关系", "实体B"])
-    st.dataframe(graph_df, use_container_width=True, hide_index=True)
-
-
-# ── Tab 4: 报表中心 ─────────────────────────────────────
-elif tab == "📊 报表中心":
-    st.title("📊 财务报表中心")
-    st.caption("一句话生成专业财务报表，支持导出和飞书推送")
-
-    report_type = st.selectbox("报表类型", [
-        "月度费用分析",
-        "部门费用对比",
-        "收入成本趋势",
-        "核心科目变动",
-    ])
-
-    if st.button("📄 生成报表", type="primary"):
-        with st.spinner("Agent 正在生成报表..."):
-            if report_type == "月度费用分析":
-                sql = PRESET_QUERIES["月度费用趋势"]
-                df = run_query(sql)
-                df['month_label'] = df['year'].astype(str) + '-' + df['period'].astype(str).str.zfill(2)
-
-                fig = go.Figure()
-                fig.add_trace(go.Bar(name='销售费用', x=df['month_label'], y=df['sales_expense']))
-                fig.add_trace(go.Bar(name='管理费用', x=df['month_label'], y=df['admin_expense']))
-                fig.add_trace(go.Bar(name='财务费用', x=df['month_label'], y=df['finance_expense']))
-                fig.update_layout(barmode='stack', title='月度费用趋势（三大费用）',
-                                template='plotly_dark', height=400)
-                st.plotly_chart(fig, use_container_width=True)
-
-                # 汇总指标
-                total_sales = df['sales_expense'].sum()
-                total_admin = df['admin_expense'].sum()
-                total_fin = df['finance_expense'].sum()
-                col1, col2, col3 = st.columns(3)
-                col1.metric("销售费用合计", f"{total_sales/10000:.1f}万")
-                col2.metric("管理费用合计", f"{total_admin/10000:.1f}万")
-                col3.metric("财务费用合计", f"{total_fin/10000:.1f}万")
-
-            elif report_type == "部门费用对比":
-                df = run_query(PRESET_QUERIES["各部门费用排名"])
-                fig = px.bar(df.head(15), x='total_expense', y='department', orientation='h',
-                            title='各部门费用排名 TOP15', template='plotly_dark',
-                            color='total_expense', color_continuous_scale='oranges')
-                fig.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
-                st.plotly_chart(fig, use_container_width=True)
-                st.dataframe(df, use_container_width=True, height=300)
-
-            elif report_type == "收入成本趋势":
-                df = run_query(PRESET_QUERIES["月度收入趋势"])
-                fig = px.line(df, x='period', y='revenue', color='year',
-                            title='收入趋势（分年度对比）', template='plotly_dark',
-                            markers=True)
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
-                st.dataframe(df, use_container_width=True)
-
-            elif report_type == "核心科目变动":
-                df = run_query(PRESET_QUERIES["核心科目余额"])
-                fig = px.bar(df.head(15), x='balance', y='account_name', orientation='h',
-                            title='核心科目余额 TOP15', template='plotly_dark',
-                            color='balance', color_continuous_scale='rdbu')
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
-                st.dataframe(df, use_container_width=True)
-
-
-# ── 页脚 ────────────────────────────────────────────────
-st.divider()
-st.caption("行业数字员工——企业记忆智能体")
+st.markdown("---")
+st.caption("行业数字员工——企业记忆智能体 · LLM 驱动 · 自然语言 → SQL → 可视化 · 全程透明可审计")
