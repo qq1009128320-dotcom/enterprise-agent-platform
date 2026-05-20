@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  streamlit:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./demo:/app/demo
+      - ./memory-engine:/app/memory-engine
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: streamlit run demo/app.py --server.address=0.0.0.0
+
+  memory-engine:
+    build: ./memory-engine
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./memory-engine/data:/app/data
+    environment:
+      - CHROMA_PERSIST_DIR=/app/data/chroma
