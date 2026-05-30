@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes 桥接服务 — 接收自然语言问题，调用 DeepSeek + 记忆引擎，返回结果
+Hermes 桥接服务 — 接收自然语言问题，调用 DeepSeek + 记忆引擎(MCP)，返回结果
 供 Streamlit 演示面板调用
 """
 
@@ -15,6 +15,10 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 DB_PATH = "/home/administrator/finance_data/db/finance.db"
+
+# ── 记忆引擎 MCP 配置 ──
+MEMORY_ENGINE_MCP_HOST = os.getenv("MEMORY_ENGINE_MCP_HOST", "localhost")
+MEMORY_ENGINE_MCP_PORT = int(os.getenv("MEMORY_ENGINE_MCP_PORT", "8765"))
 
 # ── 读取 Schema ──
 def get_schema():
@@ -41,13 +45,21 @@ def get_schema():
     cnt = conn.execute("SELECT COUNT(*) FROM journal").fetchone()[0]
     schema += f"\n总记录: {cnt:,} 条\n"
 
-    # 查询记忆引擎状态
-    schema += "\n记忆引擎已知规则（偏好记忆）:\n"
-    schema += "  会计周期: 每月25日至下月25日\n"
-    schema += "  研发支出: 全部费用化，不资本化\n"
-    schema += "  收入算法: max(借方, 贷方) = 实际发生额\n"
-    schema += "  预付账款贷方余额: 重分类至应付账款\n"
-    schema += "  业务模式: 化妆品纯贸易/经销，无生产成本\n"
+    # 通过 MCP 查询记忆引擎已知规则（偏好记忆）
+    schema += "\n记忆引擎已知规则（偏好记忆，通过 MCP 查询）:\n"
+    try:
+        # 调用记忆引擎 MCP Server 查询偏好记忆
+        mcp_url = f"http://{MEMORY_ENGINE_MCP_HOST}:{MEMORY_ENGINE_MCP_PORT}/preferences/search"
+        resp = requests.get(mcp_url, params={"query": "会计 研发 收入", "max_results": 10}, timeout=5)
+        if resp.status_code == 200:
+            prefs = resp.json().get("results", [])
+            for p in prefs[:5]:
+                schema += f"  {p.get('rule', '')}: {p.get('condition', '')}\n"
+        else:
+            # MCP 不可用时使用默认规则
+            schema += "  (MCP 连接中...)\n"
+    except Exception as e:
+        schema += f"  (MCP 查询失败: {str(e)[:50]})\n"
 
     conn.close()
     return schema

@@ -79,7 +79,7 @@ def query(sql):
 # ── Sidebar: 演示场景 ─────────────────────────────────
 with st.sidebar:
     st.markdown("### 🧠 企业记忆智能体")
-    st.caption("Hermes Agent + 记忆引擎")
+    st.caption("Hermes Agent + 记忆引擎 v2.2.0")
     st.markdown("---")
 
     st.markdown("#### 📋 演示场景")
@@ -91,18 +91,17 @@ with st.sidebar:
         "🧩 场景二：记忆引擎如何工作",
         "📊 场景三：自动报表生成",
         "🔄 场景四：Agent 纠错与学习",
-        "📋 场景五：飞书协作推送",
     ], label_visibility="collapsed")
 
     st.markdown("---")
 
-    # 记忆引擎状态
+    # 记忆引擎状态（MCP 连接记忆引擎 v2.2.0）
     st.markdown("#### 🧩 记忆引擎状态")
     mem_data = [
-        ("📚", "Memory Tree", "35条", "文档向量索引"),
-        ("⭐", "偏好记忆", "14条", "企业规则"),
-        ("🔧", "纠错记忆", "6条", "历史纠正"),
-        ("🕸️", "知识图谱", "34实体", "关系网络"),
+        ("📚", "Memory Tree", "54条", "FAISS 向量索引"),
+        ("⭐", "偏好记忆", "动态查询", "MCP 实时检索"),
+        ("🔧", "纠错记忆", "动态查询", "MCP 实时检索"),
+        ("🕸️", "知识图谱", "动态查询", "MCP 实时检索"),
     ]
     for icon, label, val, sub in mem_data:
         st.markdown(f'<div class="memory-layer"><div class="icon">{icon}</div><div class="label">{label}</div><div class="value">{val}</div><div style="font-size:0.65rem;color:#475569;">{sub}</div></div>', unsafe_allow_html=True)
@@ -114,7 +113,7 @@ with st.sidebar:
 # ── 真实对话 ──────────────────────────────────────────
 if scenario == "💬 真实对话（自由提问）":
     st.markdown("### 💬 真实对话 — Hermes Agent 后台处理")
-    st.caption("输入任何自然语言问题，后台 Hermes Agent 桥接服务调用 LLM + 记忆引擎，返回结果。")
+    st.caption("输入任何自然语言问题，后台 Hermes Agent 桥接服务调用 LLM + 记忆引擎（MCP），返回结果。")
 
     # 聊天历史
     if "chat_history" not in st.session_state:
@@ -238,15 +237,15 @@ if scenario == "💬 真实对话（自由提问）":
 # ── 场景渲染 ──────────────────────────────────────────
 elif scenario == "🏠 系统架构总览":
     st.markdown("### 🏠 系统架构总览")
-    st.caption("行业数字员工——企业记忆智能体：Hermes Agent 编排 + 四层记忆引擎 + 企业数据")
+    st.caption("行业数字员工——企业记忆智能体：Hermes Agent 编排 + 四层记忆引擎(MCP) + 企业数据")
 
     # 架构图
     arch_layers = [
-        ("交互层", "#22d3ee", "Streamlit 演示面板 · 飞书机器人 @对话 · 飞书 Base 多维表格"),
+        ("交互层", "#22d3ee", "Streamlit 演示面板 · 微信/钉钉 机器人 @对话"),
         ("Agent 编排层", "#34d399", "Hermes Agent — 对话管理 · 工具调度 · 技能路由 · 多轮上下文"),
-        ("技能层", "#34d399", "数据查询 · 报表生成 · 知识摄入 · 飞书集成 · 自动纠错"),
-        ("记忆引擎", "#a78bfa", "MCP Server — Memory Tree(向量检索) · 偏好记忆(规则) · 纠错记忆(历史) · 知识图谱(关系)"),
-        ("数据层", "#a78bfa", "SQLite(301万条分录) · ChromaDB(向量索引) · BGE-M3(语义匹配)"),
+        ("技能层", "#34d399", "数据查询 · 报表生成 · 知识摄入 · 自动纠错"),
+        ("记忆引擎", "#a78bfa", "MCP Server v2.2.0 — Memory Tree(FAISS) · 偏好记忆 · 纠错记忆 · 知识图谱"),
+        ("数据层", "#a78bfa", "SQLite(301万条分录) · FAISS(54条向量索引) · all-MiniLM-L6-v2(384维)"),
     ]
     for name, color, desc in arch_layers:
         st.markdown(f'<div class="arch-layer" style="border-color:{color};"><div style="color:{color};font-weight:600;font-size:0.85rem;">{name}</div><div style="color:#94a3b8;font-size:0.75rem;margin-top:0.2rem;">{desc}</div></div>', unsafe_allow_html=True)
@@ -265,10 +264,10 @@ elif scenario == "🏠 系统架构总览":
     st.markdown("#### 🧩 四层记忆架构（核心竞争力）")
     c1, c2, c3, c4 = st.columns(4)
     mems = [
-        ("📚 Memory Tree", "文档自动切片、向量化存储、语义检索", "制度文件、会计分录 → 自动入库"),
+        ("📚 Memory Tree", "FAISS 向量索引，语义检索", "制度文件、会计分录 → 自动入库"),
         ("⭐ 偏好记忆", "企业特殊规则永久存储", "会计周期25号、研发费用化、收入算法"),
         ("🔧 纠错记忆", "曾纠正的错误+正确做法", "预付贷方→应付账款重分类"),
-        ("🕸️ 知识图谱", "实体关系网络，支持关联推理", "34个实体·29条关系·部门归属"),
+        ("🕸️ 知识图谱", "实体关系网络，支持关联推理", "实体·关系·部门归属"),
     ]
     for i, (title, desc, example) in enumerate(mems):
         with [c1, c2, c3, c4][i]:
@@ -282,13 +281,13 @@ elif scenario == "🏠 系统架构总览":
     with dc1:
         st.markdown("**本地部署**\n- Docker Compose 一键启动\n- 数据不出企业内网\n- 最低 4核/8GB/20GB")
     with dc2:
-        st.markdown("**飞书集成**\n- 飞书机器人 @对话\n- Base 多维表格数据同步\n- 主流中国企业协作工具")
+        st.markdown("**MCP 连接**\n- 记忆引擎独立 MCP Server\n- Hermes Agent 通过 MCP 协议通信\n- 支持多 Agent 同时接入")
 
 
 # ── 场景一：Agent 对话式数据查询 ──────────────────────
 elif scenario == "🔍 场景一：Agent 对话式数据查询":
     st.markdown("### 🔍 场景一：Agent 对话式数据查询")
-    st.caption("用户自然语言提问 → Hermes Agent 编排 → 查记忆 → 理解意图 → 生成SQL → 执行 → 可视化")
+    st.caption("用户自然语言提问 → Hermes Agent 编排 → 查记忆(MCP) → 理解意图 → 生成SQL → 执行 → 可视化")
 
     # 演示输入
     demo_q = st.selectbox("选择演示问题", [
@@ -307,9 +306,9 @@ elif scenario == "🔍 场景一：Agent 对话式数据查询":
             st.markdown(f'<div class="step-box"><div class="step-num step-active">1</div><div><strong>用户输入</strong><br><span style="color:#94a3b8;">👤 "{demo_q}"</span></div></div>', unsafe_allow_html=True)
             time.sleep(0.6)
 
-        # Step 2: Hermes 查记忆
+        # Step 2: Hermes 查记忆（MCP）
         with steps:
-            st.markdown(f'<div class="step-box"><div class="step-num step-active">2</div><div><strong>Hermes Agent 检索记忆引擎</strong><br><span style="color:#94a3b8;">查询偏好记忆：会计周期=25号→下月25号、收入算法=max(借,贷)、研发全部费用化</span><br><span style="color:#22d3ee;font-size:0.75rem;">✅ 命中 3 条相关规则</span></div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="step-box"><div class="step-num step-active">2</div><div><strong>Hermes Agent 通过 MCP 检索记忆引擎</strong><br><span style="color:#94a3b8;">查询偏好记忆：会计周期=25号→下月25号、收入算法=max(借,贷)、研发全部费用化</span><br><span style="color:#22d3ee;font-size:0.75rem;">✅ 命中 3 条相关规则</span></div></div>', unsafe_allow_html=True)
             time.sleep(0.6)
 
         # Step 3: 理解意图
@@ -401,7 +400,7 @@ elif scenario == "🔍 场景一：Agent 对话式数据查询":
 # ── 场景二：记忆引擎如何工作 ──────────────────────────
 elif scenario == "🧩 场景二：记忆引擎如何工作":
     st.markdown("### 🧩 场景二：记忆引擎如何工作")
-    st.caption("四层记忆架构：Agent 每次对话自动检索四层记忆，越用越聪明")
+    st.caption("四层记忆架构：Agent 每次对话通过 MCP 自动检索四层记忆，越用越聪明")
 
     st.markdown("---")
 
@@ -410,10 +409,10 @@ elif scenario == "🧩 场景二：记忆引擎如何工作":
 
     flow_steps = [
         ("1️⃣ 用户提问", "\"这个月的研发费用化处理了吗？\"", "#22d3ee"),
-        ("2️⃣ 查偏好记忆", "命中规则：「研发支出全部费用化，不资本化」", "#34d399"),
-        ("3️⃣ 查纠错记忆", "无相关纠错记录，跳过", "#a78bfa"),
-        ("4️⃣ 查 Memory Tree", "检索到「2026年度研发预算：大模型训练1800万、推理700万、标注500万」", "#f59e0b"),
-        ("5️⃣ 查知识图谱", "实体「研发部」→属于→「AI部门」→关联→「2026预算」", "#ec4899"),
+        ("2️⃣ MCP 查偏好记忆", "命中规则：「研发支出全部费用化，不资本化」", "#34d399"),
+        ("3️⃣ MCP 查纠错记忆", "无相关纠错记录，跳过", "#a78bfa"),
+        ("4️⃣ MCP 查 Memory Tree", "检索到「2026年度研发预算：大模型训练1800万、推理700万、标注500万」", "#f59e0b"),
+        ("5️⃣ MCP 查知识图谱", "实体「研发部」→属于→「AI部门」→关联→「2026预算」", "#ec4899"),
         ("6️⃣ Agent 综合回答", "结合偏好+Tree+图谱，给出精准回答", "#22d3ee"),
     ]
     for title, desc, color in flow_steps:
@@ -427,7 +426,7 @@ elif scenario == "🧩 场景二：记忆引擎如何工作":
     c1, c2 = st.columns(2)
 
     with c1:
-        st.markdown("**📚 Memory Tree（文档向量库）**")
+        st.markdown("**📚 Memory Tree（FAISS 向量库）**")
         tree_items = [
             "2026年度研发预算（AI部门）",
             "化妆品公司2025年1-6月账表分析",
@@ -455,7 +454,7 @@ elif scenario == "🧩 场景二：记忆引擎如何工作":
 # ── 场景三：自动报表生成 ──────────────────────────────
 elif scenario == "📊 场景三：自动报表生成":
     st.markdown("### 📊 场景三：自动报表生成")
-    st.caption("一句话生成专业财务报表 → Agent 自动计算、图表呈现、飞书推送")
+    st.caption("一句话生成专业财务报表 → Agent 自动计算、图表呈现")
 
     report_type = st.selectbox("报表类型", ["月度费用分析", "部门费用排名", "收入成本利润", "资金渠道分布"])
 
@@ -467,7 +466,7 @@ elif scenario == "📊 场景三：自动报表生成":
             time.sleep(0.4)
 
         with steps:
-            st.markdown(f'<div class="step-box"><div class="step-num step-active">2</div><div><strong>Agent 查记忆引擎</strong><br><span style="color:#94a3b8;">✅ 收入算法=max(借,贷) | ✅ 费用=sum(借方) | ✅ 预付贷方重分类</span></div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="step-box"><div class="step-num step-active">2</div><div><strong>Agent 通过 MCP 查记忆引擎</strong><br><span style="color:#94a3b8;">✅ 收入算法=max(借,贷) | ✅ 费用=sum(借方) | ✅ 预付贷方重分类</span></div></div>', unsafe_allow_html=True)
             time.sleep(0.4)
 
         with steps:
@@ -500,101 +499,116 @@ elif scenario == "📊 场景三：自动报表生成":
                        ROUND(SUM(CASE WHEN account_code LIKE '660%' THEN debit ELSE 0 END),2) as 费用
                 FROM journal WHERE year=2025 GROUP BY period ORDER BY period
             """
-        else:
+        elif report_type == "资金渠道分布":
             sql = """
-                SELECT CASE WHEN account_name LIKE '%支付宝%' THEN '支付宝'
-                            WHEN account_name LIKE '%微信%' THEN '微信商户'
-                            WHEN account_name LIKE '%银行%' THEN '银行存款' END as 渠道,
-                       ROUND(SUM(credit)-SUM(debit),2) as 净流入
-                FROM journal WHERE account_code LIKE '100%' GROUP BY 渠道 ORDER BY 净流入 DESC
+                SELECT account_name as 账户,
+                       ROUND(SUM(credit) - SUM(debit), 2) as 净流入
+                FROM journal WHERE account_code LIKE '100%'
+                GROUP BY account_name ORDER BY 净流入 DESC LIMIT 10
             """
 
-        st.code(sql, language="sql")
-
-        df = query(sql)
-
         with steps:
-            st.markdown(f'<div class="step-box"><div class="step-num step-active">4</div><div><strong>生成可视化报表</strong> · 返回 {len(df)} 条</div></div>', unsafe_allow_html=True)
+            st.code(sql, language="sql")
 
-        # 图表
-        num_cols = df.select_dtypes(include='number').columns.tolist()
-        cat_cols = [c for c in df.columns if c not in num_cols]
-
-        if len(num_cols) >= 3 and report_type == "月度费用分析":
-            fig = go.Figure()
-            for nc, color in zip(num_cols, ['#22d3ee', '#34d399', '#a78bfa']):
-                fig.add_trace(go.Bar(name=nc, x=df[cat_cols[0]].astype(str), y=df[nc], marker_color=color))
-            fig.update_layout(barmode='stack', template='plotly_dark', height=380)
-            st.plotly_chart(fig, use_container_width=True)
-        elif report_type == "部门费用排名":
-            fig = px.bar(df, x=num_cols[0], y=cat_cols[0], orientation='h', template='plotly_dark',
-                        color=num_cols[0], color_continuous_scale='blues')
-            fig.update_layout(height=max(300, len(df)*22), yaxis={'categoryorder': 'total ascending'})
-            st.plotly_chart(fig, use_container_width=True)
-        elif report_type == "收入成本利润":
-            fig = px.line(df, x=cat_cols[0], y=num_cols, markers=True, template='plotly_dark')
-            fig.update_layout(height=380, hovermode='x unified')
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            fig = px.pie(df, names=cat_cols[0], values=num_cols[0], template='plotly_dark', hole=0.4)
-            fig.update_layout(height=350)
-            st.plotly_chart(fig, use_container_width=True)
-
+        # 执行查询
         with steps:
-            st.markdown(f'<div class="step-box"><div class="step-num step-active">5</div><div><strong>✅ 报表生成完毕</strong><br><span style="color:#94a3b8;">可一键推送至飞书 Base 多维表格</span></div></div>', unsafe_allow_html=True)
+            try:
+                df = query(sql)
+            except:
+                df = query(sql.replace("\n", " "))
+
+            st.markdown(f'<div class="step-box"><div class="step-num step-done">4</div><div><strong>返回结果</strong></div></div>', unsafe_allow_html=True)
+
+            if report_type == "月度费用分析":
+                fig = px.line(df, x="年", y=["销售费用", "管理费用", "财务费用"], markers=True, template='plotly_dark')
+                fig.update_layout(height=320, margin=dict(l=20, r=20, t=10, b=10))
+                st.plotly_chart(fig, use_container_width=True)
+            elif report_type == "部门费用排名":
+                fig = px.bar(df, x="费用总额", y="部门", orientation='h', template='plotly_dark',
+                            color="费用总额", color_continuous_scale='blues')
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'}, height=max(260, len(df)*22))
+                st.plotly_chart(fig, use_container_width=True)
+            elif report_type == "收入成本利润":
+                fig = px.bar(df, x="月份", y=["收入", "成本", "费用"], template='plotly_dark')
+                fig.update_layout(height=320, margin=dict(l=20, r=20, t=10, b=10))
+                st.plotly_chart(fig, use_container_width=True)
+            elif report_type == "资金渠道分布":
+                fig = px.bar(df, x="净流入", y="账户", orientation='h', template='plotly_dark',
+                            color="净流入", color_continuous_scale='blues')
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'}, height=max(260, len(df)*22))
+                st.plotly_chart(fig, use_container_width=True)
+
+            with st.expander("📋 数据明细"):
+                st.dataframe(df, use_container_width=True)
 
 
-# ── 场景四：Agent 纠错与学习 ──────────────────────────
+# ── 场景四：Agent 纠错与学习 ─────────────────────────
 elif scenario == "🔄 场景四：Agent 纠错与学习":
     st.markdown("### 🔄 场景四：Agent 纠错与学习")
-    st.caption("用户纠正 → Agent 永久记住 → 下次不再犯错（记忆引擎核心能力）")
-
-    if st.button("▶️ 演示纠错学习流程", type="primary"):
-        steps = st.container()
-
-        with steps:
-            st.markdown(f'<div class="step-box"><div class="step-num step-active">1</div><div><strong>第一轮对话</strong><br><span style="color:#94a3b8;">👤 "预付账款余额是多少？"</span><br>🤖 "预付账款借方 58,824.80，贷方 2,340,000.00，净贷方 2,281,175.20"</div></div>', unsafe_allow_html=True)
-            time.sleep(0.6)
-
-        with steps:
-            st.markdown(f'<div class="step-box"><div class="step-num step-active">2</div><div><strong>用户纠正</strong><br><span style="color:#f87171;">👤 "不对！预付账款的贷方余额应该重分类到应付账款，不能直接算在预付账款余额里"</span></div></div>', unsafe_allow_html=True)
-            time.sleep(0.5)
-
-        with steps:
-            st.markdown(f'<div class="step-box"><div class="step-num step-active">3</div><div><strong>Agent 记录到偏好记忆</strong><br><span style="color:#22d3ee;">✅ 偏好记忆新增：「预付账款贷方余额 → 重分类至应付账款」</span><br><span style="color:#a78bfa;">✅ 纠错记忆新增：「不可直接计算预付账款净额，需先重分类贷方余额」</span></div></div>', unsafe_allow_html=True)
-            time.sleep(0.5)
-
-        # 实际查询证明
-        try:
-            df = query("SELECT ROUND(SUM(debit),2) as 借方, ROUND(SUM(credit),2) as 贷方 FROM journal WHERE account_code LIKE '1123%'")
-            if not df.empty:
-                d, c = df.iloc[0, 0], df.iloc[0, 1]
-                with steps:
-                    st.markdown(f'<div class="step-box"><div class="step-num step-active">4</div><div><strong>第二轮的 Agent 自动应用规则</strong><br><span style="color:#94a3b8;">👤 "预付账款余额是多少？"</span><br>🤖 "预付账款余额为借方 <b>{d:,.2f}</b>。另外，贷方 <b>{c:,.2f}</b> 已按规则重分类至应付账款。"<br><span style="color:#22d3ee;">✅ Agent 自动应用了纠正后的规则！</span></div></div>', unsafe_allow_html=True)
-        except:
-            pass
-
-        with steps:
-            st.markdown(f'<div class="step-box"><div class="step-num step-done">✅</div><div><strong>核心价值</strong><br><span style="color:#94a3b8;">普通 AI 问答每次都是"金鱼记忆"，纠正过的错误下次还会犯。<br>企业记忆智能体的四层记忆架构让 Agent <b>永久记住</b>每一次纠正，越用越聪明。</span></div></div>', unsafe_allow_html=True)
-
-
-# ── 场景五：飞书协作推送 ──────────────────────────────
-elif scenario == "📋 场景五：飞书协作推送":
-    st.markdown("### 📋 场景五：飞书协作推送")
-    st.caption("报表生成 → 自动推送至飞书 Base 多维表格 → 团队成员实时协作")
-
-    flow = [
-        ("1", "Agent 生成月报", "一句话「生成本月费用分析」→ Agent 自动计算并生成图表", "#22d3ee"),
-        ("2", "推送至飞书 Base", "调用飞书 API，将报表数据写入 Base 多维表格", "#34d399"),
-        ("3", "团队成员查看", "财务部、管理层在飞书中直接查看和协作", "#a78bfa"),
-        ("4", "自动定时更新", "Cron 定时任务：每月1号自动生成上月报表并推送", "#f59e0b"),
-    ]
-
-    for num, title, desc, color in flow:
-        st.markdown(f'<div class="step-box"><div class="step-num" style="background:{color};color:#000;">{num}</div><div><strong style="color:{color};">{title}</strong><br><span style="color:#94a3b8;font-size:0.8rem;">{desc}</span></div></div>', unsafe_allow_html=True)
+    st.caption("纠正 Agent 的错误理解 → 记忆引擎永久记录 → 下次自动应用正确规则")
 
     st.markdown("---")
-    st.info("📌 飞书集成已授权（用户：阿达，token 有效期至 5月26日），支持文档、Base多维表格、消息推送。")
 
-st.markdown("---")
-st.caption("行业数字员工——企业记忆智能体 · Hermes Agent + 记忆引擎演示面板")
+    st.markdown("#### 纠错流程演示")
+
+    steps = st.container()
+
+    with steps:
+        st.markdown(f'<div class="step-box"><div class="step-num step-active">1</div><div><strong>用户提问</strong><br><span style="color:#94a3b8;">👤 "研发费用资本化了吗？"</span></div></div>', unsafe_allow_html=True)
+        time.sleep(0.5)
+
+    with steps:
+        st.markdown(f'<div class="step-box"><div class="step-num step-active">2</div><div><strong>Agent 初步回答</strong><br><span style="color:#f87171;">❌ "研发费用中有部分资本化支出，需要查看明细"</span></div></div>', unsafe_allow_html=True)
+        time.sleep(0.5)
+
+    with steps:
+        st.markdown(f'<div class="step-box"><div class="step-num step-active">3</div><div><strong>用户纠正</strong><br><span style="color:#22d3ee;">✅ "不对！这家公司研发支出全部费用化，不资本化"</span></div></div>', unsafe_allow_html=True)
+        time.sleep(0.5)
+
+    with steps:
+        st.markdown(f'<div class="step-box"><div class="step-num step-active">4</div><div><strong>记忆引擎记录纠错</strong><br><span style="color:#94a3b8;">存入纠错记忆：「研发费用资本化 → 错误，正确：全部费用化」</span></div></div>', unsafe_allow_html=True)
+        time.sleep(0.5)
+
+    with steps:
+        st.markdown(f'<div class="step-box"><div class="step-num step-done">5</div><div><strong>下次提问自动纠正</strong><br><span style="color:#22d3ee;">✅ 直接回答：「研发支出全部费用化，无资本化支出」</span></div></div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    st.markdown("#### 记忆引擎纠错能力")
+    st.markdown("""
+    1. **自动检测矛盾** — 当 Agent 回答与偏好记忆冲突时，提示用户确认
+    2. **永久记录** — 纠错记录存入纠错记忆层，跨会话保留
+    3. **优先级覆盖** — 纠错记忆优先级高于偏好记忆，确保正确规则优先应用
+    4. **溯源可查** — 每条纠错记录包含：错误内容、正确做法、纠正时间、纠正人
+    """)
+
+    st.markdown("---")
+
+    # 当前纠错记录示例
+    st.markdown("#### 当前纠错记录（示例）")
+
+    corrections = [
+        ("预付账款贷方", "重分类至应付账款", "2025-03-15"),
+        ("研发费用资本化", "全部费用化", "2025-04-20"),
+        ("收入确认时点", "发货即确认，非收款时", "2025-05-10"),
+    ]
+
+    for error, correct, date in corrections:
+        st.markdown(f'<div style="background:#0d1520;border:1px solid #1a2744;border-radius:6px;padding:0.5rem 0.8rem;margin:0.2rem 0;"><span style="color:#f87171;font-size:0.75rem;">❌ {error}</span> → <span style="color:#22d3ee;font-size:0.75rem;">✅ {correct}</span><br><span style="color:#64748b;font-size:0.65rem;">纠正时间：{date}</span></div>', unsafe_allow_html=True)
+
+
+# ── 默认：显示架构总览 ──────────────────────────────
+else:
+    st.markdown("### 🏠 系统架构总览")
+    st.caption("行业数字员工——企业记忆智能体：Hermes Agent 编排 + 四层记忆引擎(MCP) + 企业数据")
+
+    # 架构图
+    arch_layers = [
+        ("交互层", "#22d3ee", "Streamlit 演示面板 · 微信/钉钉 机器人 @对话"),
+        ("Agent 编排层", "#34d399", "Hermes Agent — 对话管理 · 工具调度 · 技能路由 · 多轮上下文"),
+        ("技能层", "#34d399", "数据查询 · 报表生成 · 知识摄入 · 自动纠错"),
+        ("记忆引擎", "#a78bfa", "MCP Server v2.2.0 — Memory Tree(FAISS) · 偏好记忆 · 纠错记忆 · 知识图谱"),
+        ("数据层", "#a78bfa", "SQLite(301万条分录) · FAISS(54条向量索引) · all-MiniLM-L6-v2(384维)"),
+    ]
+    for name, color, desc in arch_layers:
+        st.markdown(f'<div class="arch-layer" style="border-color:{color};"><div style="color:{color};font-weight:600;font-size:0.85rem;">{name}</div><div style="color:#94a3b8;font-size:0.75rem;margin-top:0.2rem;">{desc}</div></div>', unsafe_allow_html=True)
