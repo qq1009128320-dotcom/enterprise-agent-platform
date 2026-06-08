@@ -1,12 +1,19 @@
 # 行业数字员工——企业记忆智能体
 
-**让每家企业拥有一个懂自家业务数据、会学习、不遗忘的 AI 数字员工。**
+> **让每家企业拥有一个懂自家业务数据、会学习、不遗忘的 AI 数字员工。**
+> 参赛作品 — 2026武汉经开区"经开智造"AI智能体大赛 · 场景落地类赛道
+
+[![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-FF6B35?style=flat)](https://hermes-agent.nousresearch.com)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat&logo=python)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=flat&logo=streamlit)](https://streamlit.io)
+[![FAISS](https://img.shields.io/badge/FAISS-384dim-00C853?style=flat)](https://github.com/facebookresearch/faiss)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
 ## 一句话说清楚
 
-上传企业文档和数据 → Agent 自动理解、记住、对话分析 → 越用越聪明，不再犯同样的错。
+**上传企业文档和数据 → Agent 自动理解、记住、对话分析 → 越用越聪明，不再犯同样的错。**
 
 和普通 AI 问答的区别：**这个 Agent 有长期记忆。**
 
@@ -31,26 +38,26 @@
 │     Streamlit Web  │  微信/钉钉 机器人 @对话       │
 ├─────────────────────────────────────────────────┤
 │              Agent 编排层 (Hermes)               │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────┐    │
-│  │ 数据查询  │ │ 报表生成  │ │ 知识摄入      │    │
-│  │ 文档问答  │ │ 自动纠错  │ │ 记忆检索      │    │
-│  └──────────┘ └──────────┘ └──────────────┘    │
+│  对话管理 · 工具调度 · 技能路由 · 多轮上下文      │
 ├─────────────────────────────────────────────────┤
-│          企业记忆引擎 (MCP Server)               │
+│                 技能层                           │
+│  数据查询 · 报表生成 · 知识摄入 · 自动纠错       │
+├─────────────────────────────────────────────────┤
+│          企业记忆引擎 (MCP Server v2.2.0)        │
 │                                                  │
-│  ┌─────────┐ ┌─────────┐ ┌────────┐ ┌───────┐  │
-│  │Memory   │ │偏好记忆  │ │纠错记忆 │ │知识   │  │
-│  │Tree     │ │字段映射  │ │历史错误 │ │图谱   │  │
-│  │文档向量 │ │会计周期  │ │正确做法 │ │实体   │  │
-│  │检索     │ │命名习惯  │ │         │ │关系   │  │
-│  └─────────┘ └─────────┘ └────────┘ └───────┘  │
+│  ┌──────────┐ ┌──────────┐ ┌────────┐ ┌──────┐  │
+│  │Memory   │ │偏好记忆  │ │纠错记忆 │ │知识  │  │
+│  │Tree     │ │字段映射  │ │历史错误 │ │图谱  │  │
+│  │FAISS向量│ │会计周期  │ │正确做法 │ │实体  │  │
+│  │检索     │ │命名习惯  │ │         │ │关系  │  │
+│  └──────────┘ └──────────┘ └────────┘ └──────┘  │
 │                                                  │
-│         FAISS 向量库 + SQLite 结构化存储         │
+│         FAISS 向量库 + SQLite 结构化存储          │
 │         嵌入模型: all-MiniLM-L6-v2 (384维)       │
 └─────────────────────────────────────────────────┘
 ```
 
-**四层记忆是核心竞争力：**
+### 四层记忆架构（核心竞争力）
 
 | 层级 | 做什么 | 例子 |
 |------|--------|------|
@@ -61,31 +68,58 @@
 
 ---
 
-## 演示案例：化妆品公司财务智能分析
+## 演示场景
 
-基于真实企业数据（301万条会计分录、116个科目、21个部门），演示完整工作流：
+平台包含6个演示场景，通过左侧边栏切换：
 
-1. **知识摄入** — 将公司制度文档、会计政策导入记忆引擎
-2. **数据对话** — 用自然语言提问，Agent 自动查询数据库并生成图表
-3. **记忆学习** — 纠正 Agent 的错误理解，它永久记住
-4. **跨会话验证** — 新会话再问同样问题，Agent 直接用正确方式回答
-5. **自动报表** — 一句话生成月度利润表、费用分析、驾驶舱大屏
+1. **💬 真实对话（自由提问）** — 核心功能，自然语言提问，Agent 自动处理
+2. **🏠 系统架构总览** — 架构图、数据统计、四层记忆详解、部署方案
+3. **🔍 Agent 对话式数据查询** — 分步演示5种典型查询（含实时数据 + 图表）
+4. **🧩 记忆引擎如何工作** — 记忆检索流程展示 + 当前记忆状态
+5. **📊 自动报表生成** — 一句话生成月度费用分析/部门排名/利润表/资金分布
+6. **🔄 Agent 纠错与学习** — 演示纠正→记住→下次正确回答的闭环
 
 ---
 
 ## 快速开始
+
+### 环境要求
+- Python 3.10+
+- Git
+
+### 方式一：一键部署
 
 ```bash
 # 1. 克隆本项目
 git clone https://github.com/qq1009128320-dotcom/enterprise-agent-platform.git
 cd enterprise-agent-platform
 
-# 2. 一键部署
+# 2. 一键部署（安装依赖 + 克隆记忆引擎）
 bash setup.sh
 
-# 3. 启动演示
-streamlit run demo/app.py
+# 3. 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入 DEEPSEEK_API_KEY
+
+# 4. 启动记忆引擎 MCP Server（新终端）
+cd memory-engine
+python memory_server.py --port 8765
+
+# 5. 启动演示面板（新终端）
+cd ..
+streamlit run demo/app.py --server.port 8501
 ```
+
+### 方式二：Docker 部署
+
+```bash
+docker-compose up -d
+# 访问 http://localhost:8501
+```
+
+### 访问方式
+- 演示面板：http://localhost:8501
+- 数据基于 301 万条真实企业会计分录
 
 ---
 
@@ -94,7 +128,7 @@ streamlit run demo/app.py
 | 组件 | 技术 | 说明 |
 |------|------|------|
 | Agent 框架 | Hermes Agent | 对话编排、工具调用、多技能调度 |
-| 记忆引擎 | Enterprise Memory v2.2.0 | 独立 MCP Server，四层记忆架构，FAISS 向量索引 |
+| 记忆引擎 | Enterprise Memory v2.2.0 | 独立 MCP Server，四层记忆架构 |
 | 向量检索 | FAISS + all-MiniLM-L6-v2 | 384维嵌入，语义匹配，支持中文 |
 | 演示界面 | Streamlit | 交互式数据对话和分析 |
 | 企业协作 | 微信/钉钉 | 机器人集成、消息推送 |
@@ -106,23 +140,32 @@ streamlit run demo/app.py
 
 ```
 enterprise-agent-platform/
-├── README.md           # 项目说明（本文件）
-├── setup.sh            # 一键部署脚本
-├── docker-compose.yml  # Docker 部署
+├── README.md               # 项目说明
+├── setup.sh                # 一键部署脚本
+├── docker-compose.yml      # Docker 编排
+├── .env.example            # 环境变量模板
 ├── demo/
-│   ├── app.py          # Streamlit 演示界面
-│   └── demo_data/      # 演示用企业数据
+│   ├── app.py              # Streamlit 演示面板（6个场景）
+│   ├── hermes_bridge.py    # Hermes Agent 桥接服务
+│   └── requirements.txt    # Python 依赖
 ├── config/
 │   └── hermes_config.yaml  # Agent 配置示例
 ├── docs/
-│   └── architecture.md     # 详细技术架构说明
+│   ├── architecture.html   # 详细技术架构说明
+│   └── 项目说明_行业数字员工.pdf
 └── scripts/
-    └── demo_workflow.sh     # 演示流程脚本
+    └── demo_workflow.sh    # 演示流程脚本
 ```
 
 ---
 
 ## 相关仓库
 
-- 企业记忆引擎：[memory-engine](https://github.com/qq1009128320-dotcom/memory-engine)
-- 报表驾驶舱：[financial-statements](https://github.com/qq1009128320-dotcom/financial-statements)
+- [企业记忆引擎 (memory-engine)](https://github.com/qq1009128320-dotcom/memory-engine) — 四层记忆 MCP Server
+- [报表驾驶舱 (financial-statements)](https://github.com/qq1009128320-dotcom/financial-statements) — 财务分析大屏
+
+---
+
+## License
+
+MIT
